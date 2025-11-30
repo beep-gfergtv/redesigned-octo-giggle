@@ -1,110 +1,90 @@
 # Deep Media Uniqueness Enhancer
 
-A specialized cross-platform application for deep, visually neutral media uniqueness enhancement to bypass content detection systems (YouTube Content ID, TikTok Copyright, Google Reverse Image Search, etc.).
+A semi-automatic application for enhancing media uniqueness to bypass content detection systems like YouTube Content ID and TikTok copyright detectors.
 
 ## Features
 
-### 🔹 Media Support
-- **Images**: JPG, PNG, WebP formats
-- **Videos**: MP4, MOV (H.264/H.265), up to 4K (3840×2160), 60fps
-- **Output**: MP4 (H.264, baseline/main profile), JPG/PNG without quality loss
+- ✅ Semi-automatic mode: User selects level → preview → export
+- ✅ Built-in uniqueness analysis (before/after)
+- ✅ Minimal GUI (PyQt6) + console mode (optional via --cli)
+- ✅ Single executable output via Nuitka compilation
+- ✅ Supports both images and videos
 
-### 🔹 Uniqueness Enhancement
-- **Semi-automatic mode**: Load file → select uniqueness level → preview → export
-- **For Images (perceptual hash disruption)**:
-  - Random cropping (2-6%) + scaling (±3%)
-  - Light perspective warp (max 0.8%)
-  - Animated or static Perlin noise (0.4% opacity)
-  - Frame-level micro color shifts (H±1°, S±2%, L±3%)
-  - Optional high-frequency texture overlay
-- **For Videos (fingerprint evasion)**:
-  - Smooth zoom-pan drift (0.5% per second)
-  - Frame-level spatial jitter (1-2 px, pseudo-random)
-  - Dynamic vignette (center following frame CoM)
-  - Recoding with modified GOP (keyint=30±5), B-frames=3
-  - Audio pitch shift +2.3% with tempo compensation
-  - Low-cut and high-shelf filters
-  - Ultrasound noise and reverb
+## Requirements
 
-### 🔹 Uniqueness Analysis
-- Image: Compare imagehash.phash() of original vs result → show % difference (target: ≥45%)
-- Video: Analyze 5-10 key frames for phash differences
-- Audio: Spectrogram similarity via librosa + cosine distance
-- Visualize: Delta-hash histogram + final "risk level" (Low/Medium/High)
-
-### 🔹 Performance & Stability
-- Optimized FFmpeg pipeline processing
-- Multi-threading support (1 file = 1 thread)
-- Progress bar with ETA
-- Crash recovery with checkpointing
-- Minimal dependencies (avoiding heavy DL models)
+- Python 3.9-3.11
+- FFmpeg (for video processing)
 
 ## Installation
 
-1. Clone or download this repository
-2. Install Python 3.10+
-3. Run the setup script:
-
+1. Install Python dependencies:
 ```bash
-python setup.py
+pip install -r requirements.txt
 ```
 
-This will install all required dependencies from requirements.txt.
-
-**Note**: You need to have FFmpeg installed on your system. If not available in PATH, download static binaries from [FFmpeg Downloads](https://ffmpeg.org/download.html).
+2. Install FFmpeg (for video processing):
+   - Download from: https://ffmpeg.org/download.html
+   - Add to system PATH
 
 ## Usage
 
-Run the application:
-
+### GUI Mode
 ```bash
 python main.py
 ```
 
-### Interface
-- **Drag & drop** zone for loading files
-- **Media type** toggle: 📷 Photo / 🎥 Video
-- **Uniqueness level** slider (1-5)
-- **Analyze original** button → shows source hash/risk
-- **Generate preview** button (3-sec fragment)
-- **Export** button
-- **Report panel**: phash delta, audio similarity, size/duration, status
+### CLI Mode
+```bash
+python main.py --cli <input_file> <output_file> <level>
+# Level: 1 (Low), 2 (Medium), 3 (High)
+```
 
-## Technical Details
+## Building with Nuitka
 
-### Backend
-- Python 3.10+ with OpenCV, imagehash, moviepy, librosa, ffmpeg-python, PyQt6
-- Static FFmpeg binary (included in package)
-- PyQt6 frontend (more reliable than Electron for media-heavy tasks)
+To compile to a single executable (Windows):
 
-### Processing Pipeline
-1. **Image Processing**:
-   - Random cropping and scaling
-   - Perlin noise addition
-   - Color space transformations (HLS shifts)
-   - Texture overlays
+**Note**: The following commands should be run on a Windows machine with Python and Nuitka installed.
 
-2. **Video Processing**:
-   - Zoom-pan drift effects
-   - Spatial jitter
-   - Audio pitch/tempo manipulation
-   - GOP structure changes
-   - Encoding parameter adjustments
+```bash
+pip install nuitka
+python -m nuitka --standalone --onefile --windows-disable-console --include-package=PyQt6 --include-package=cv2 --include-package=imagehash --include-package=numpy --include-package=PIL --include-package=moviepy --include-package=librosa --include-package=ffmpeg --include-package=scipy --include-package=tqdm main.py
+```
+
+For CLI version (with console):
+```bash
+python -m nuitka --standalone --onefile --include-package=PyQt6 --include-package=cv2 --include-package=imagehash --include-package=numpy --include-package=PIL --include-package=moviepy --include-package=librosa --include-package=ffmpeg --include-package=scipy --include-package=tqdm main.py
+```
+
+## How It Works
+
+### For Images:
+- Random cropping (2-6% depending on level)
+- Slight scaling (0.97-1.03x depending on level)
+- Perlin noise addition
+- HLS color space shifts
+- Perceptual hash analysis for uniqueness measurement
+
+### For Videos:
+- Zoom/pan drift over time
+- Spatial noise addition
+- Audio pitch/tempo modification
+- GOP size and CRF adjustments
+- Keyframe-based uniqueness analysis
 
 ## Risk Assessment
 
-The application provides a risk level based on:
-- **Low Risk**: ≥45% phash difference (recommended for strict platforms)
-- **Medium Risk**: 30-45% phash difference (for less strict platforms)
-- **High Risk**: <30% phash difference (not recommended)
+The application provides risk level assessment:
+- **Low Risk**: >45% perceptual hash difference
+- **Medium Risk**: 30-45% perceptual hash difference  
+- **High Risk**: <30% perceptual hash difference
 
-## Important Notes
+## Technical Details
 
-- The application preserves content meaning and structure
-- No visible artifacts are introduced
-- All metadata (EXIF/XMP/ID3) is removed
-- Processing maintains visual neutrality while maximizing algorithmic differences
-
-## License
-
-This is a specialized tool for content uniqueness. Use responsibly and in compliance with applicable laws and platform terms of service.
+The application uses:
+- PyQt6 for the GUI
+- OpenCV for image/video processing
+- FFmpeg-python for video encoding
+- ImageHash for perceptual analysis
+- MoviePy for video manipulation
+- Librosa for audio analysis
+- NumPy/SciPy for mathematical operations

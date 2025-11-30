@@ -10,12 +10,6 @@ import cv2
 import numpy as np
 import imagehash
 from PIL import Image
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
-                            QHBoxLayout, QPushButton, QLabel, QSlider, 
-                            QFileDialog, QProgressBar, QTextEdit, QComboBox,
-                            QGroupBox, QRadioButton, QButtonGroup)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
-from PyQt6.QtGui import QPixmap, QDragEnterEvent, QDropEvent
 import tempfile
 import hashlib
 import json
@@ -26,6 +20,39 @@ import time
 from moviepy import VideoFileClip, AudioFileClip
 import librosa
 from scipy.spatial.distance import cosine
+
+# Import PyQt6 modules only when needed (for GUI mode)
+def get_qt_modules():
+    from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
+                                QHBoxLayout, QPushButton, QLabel, QSlider, 
+                                QFileDialog, QProgressBar, QTextEdit, QComboBox,
+                                QGroupBox, QRadioButton, QButtonGroup)
+    from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
+    from PyQt6.QtGui import QPixmap, QDragEnterEvent, QDropEvent
+    return {
+        'QApplication': QApplication,
+        'QMainWindow': QMainWindow,
+        'QWidget': QWidget,
+        'QVBoxLayout': QVBoxLayout,
+        'QHBoxLayout': QHBoxLayout,
+        'QPushButton': QPushButton,
+        'QLabel': QLabel,
+        'QSlider': QSlider,
+        'QFileDialog': QFileDialog,
+        'QProgressBar': QProgressBar,
+        'QTextEdit': QTextEdit,
+        'QComboBox': QComboBox,
+        'QGroupBox': QGroupBox,
+        'QRadioButton': QRadioButton,
+        'QButtonGroup': QButtonGroup,
+        'Qt': Qt,
+        'QThread': QThread,
+        'pyqtSignal': pyqtSignal,
+        'QTimer': QTimer,
+        'QPixmap': QPixmap,
+        'QDragEnterEvent': QDragEnterEvent,
+        'QDropEvent': QDropEvent
+    }
 
 
 class MediaProcessor:
@@ -268,18 +295,20 @@ class MediaProcessor:
             return "Высокий"
 
 
-class ProcessingThread(QThread):
+class ProcessingThread:
     """Thread for processing media in background"""
-    progress = pyqtSignal(int)
-    finished = pyqtSignal(str)  # Output path
     
-    def __init__(self, processor, input_path, output_path, media_type, level):
-        super().__init__()
+    def __init__(self, processor, input_path, output_path, media_type, level, qt_modules=None):
         self.processor = processor
         self.input_path = input_path
         self.output_path = output_path
         self.media_type = media_type
         self.level = level
+        self.qt_modules = qt_modules
+        if qt_modules:
+            self.pyqtSignal = qt_modules['pyqtSignal']
+            self.progress = self.pyqtSignal(int)
+            self.finished = self.pyqtSignal(str)  # Output path
     
     def run(self):
         try:
@@ -288,22 +317,26 @@ class ProcessingThread(QThread):
             else:
                 self.processor.process_video(self.input_path, self.output_path, self.level)
             
-            self.finished.emit(self.output_path)
+            if self.qt_modules:
+                self.finished.emit(self.output_path)
         except Exception as e:
             print(f"Processing error: {e}")
-            self.finished.emit("")
+            if self.qt_modules:
+                self.finished.emit("")
 
 
-class PreviewThread(QThread):
+class PreviewThread:
     """Thread for generating preview"""
-    preview_ready = pyqtSignal(str)  # Preview path
     
-    def __init__(self, processor, input_path, media_type, level):
-        super().__init__()
+    def __init__(self, processor, input_path, media_type, level, qt_modules=None):
         self.processor = processor
         self.input_path = input_path
         self.media_type = media_type
         self.level = level
+        self.qt_modules = qt_modules
+        if qt_modules:
+            self.pyqtSignal = qt_modules['pyqtSignal']
+            self.preview_ready = self.pyqtSignal(str)  # Preview path
     
     def run(self):
         try:
@@ -324,17 +357,42 @@ class PreviewThread(QThread):
                 
                 os.remove(temp_preview)
             
-            self.preview_ready.emit(preview_path)
+            if self.qt_modules:
+                self.preview_ready.emit(preview_path)
         except Exception as e:
             print(f"Preview generation error: {e}")
-            self.preview_ready.emit("")
+            if self.qt_modules:
+                self.preview_ready.emit("")
 
 
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Deep Media Uniqueness Enhancer")
-        self.setGeometry(100, 100, 800, 600)
+class MainWindow:
+    def __init__(self, qt_modules):
+        self.qt_modules = qt_modules
+        self.QApplication = qt_modules['QApplication']
+        self.QMainWindow = qt_modules['QMainWindow']
+        self.QWidget = qt_modules['QWidget']
+        self.QVBoxLayout = qt_modules['QVBoxLayout']
+        self.QHBoxLayout = qt_modules['QHBoxLayout']
+        self.QPushButton = qt_modules['QPushButton']
+        self.QLabel = qt_modules['QLabel']
+        self.QSlider = qt_modules['QSlider']
+        self.QFileDialog = qt_modules['QFileDialog']
+        self.QProgressBar = qt_modules['QProgressBar']
+        self.QTextEdit = qt_modules['QTextEdit']
+        self.QGroupBox = qt_modules['QGroupBox']
+        self.QRadioButton = qt_modules['QRadioButton']
+        self.QButtonGroup = qt_modules['QButtonGroup']
+        self.Qt = qt_modules['Qt']
+        self.QThread = qt_modules['QThread']
+        self.pyqtSignal = qt_modules['pyqtSignal']
+        self.QPixmap = qt_modules['QPixmap']
+        self.QDragEnterEvent = qt_modules['QDragEnterEvent']
+        self.QDropEvent = qt_modules['QDropEvent']
+        
+        # Initialize the main window
+        self.window = self.QMainWindow()
+        self.window.setWindowTitle("Deep Media Uniqueness Enhancer")
+        self.window.setGeometry(100, 100, 800, 600)
         
         self.processor = MediaProcessor()
         self.current_file = None
@@ -345,14 +403,14 @@ class MainWindow(QMainWindow):
         self.init_ui()
         
     def init_ui(self):
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        layout = QVBoxLayout(central_widget)
+        central_widget = self.QWidget()
+        self.window.setCentralWidget(central_widget)
+        layout = self.QVBoxLayout(central_widget)
         
         # Media type selector
-        type_layout = QHBoxLayout()
-        self.photo_radio = QRadioButton("📷 Фото")
-        self.video_radio = QRadioButton("🎥 Видео")
+        type_layout = self.QHBoxLayout()
+        self.photo_radio = self.QRadioButton("📷 Фото")
+        self.video_radio = self.QRadioButton("🎥 Видео")
         self.video_radio.setChecked(True)
         
         type_layout.addWidget(self.photo_radio)
@@ -360,8 +418,8 @@ class MainWindow(QMainWindow):
         layout.addLayout(type_layout)
         
         # File drop area
-        self.drop_area = QLabel("Перетащите файл сюда или нажмите для выбора")
-        self.drop_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.drop_area = self.QLabel("Перетащите файл сюда или нажмите для выбора")
+        self.drop_area.setAlignment(self.Qt.AlignmentFlag.AlignCenter)
         self.drop_area.setStyleSheet("""
             QLabel {
                 border: 2px dashed #ccc;
@@ -377,33 +435,33 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.drop_area)
         
         # Uniqueness level
-        level_group = QGroupBox("Уровень уникализации")
-        level_layout = QHBoxLayout(level_group)
+        level_group = self.QGroupBox("Уровень уникализации")
+        level_layout = self.QHBoxLayout(level_group)
         
-        self.level_slider = QSlider(Qt.Orientation.Horizontal)
+        self.level_slider = self.QSlider(self.Qt.Orientation.Horizontal)
         self.level_slider.setMinimum(1)
         self.level_slider.setMaximum(5)
         self.level_slider.setValue(3)
         self.level_slider.valueChanged.connect(self.update_level_label)
         
-        self.level_label = QLabel("Средний (3/5)")
+        self.level_label = self.QLabel("Средний (3/5)")
         level_layout.addWidget(self.level_slider)
         level_layout.addWidget(self.level_label)
         
         layout.addWidget(level_group)
         
         # Action buttons
-        button_layout = QHBoxLayout()
+        button_layout = self.QHBoxLayout()
         
-        self.analyze_btn = QPushButton("Анализировать оригинал")
+        self.analyze_btn = self.QPushButton("Анализировать оригинал")
         self.analyze_btn.clicked.connect(self.analyze_original)
         self.analyze_btn.setEnabled(False)
         
-        self.preview_btn = QPushButton("Сгенерировать preview")
+        self.preview_btn = self.QPushButton("Сгенерировать preview")
         self.preview_btn.clicked.connect(self.generate_preview)
         self.preview_btn.setEnabled(False)
         
-        self.export_btn = QPushButton("Экспортировать")
+        self.export_btn = self.QPushButton("Экспортировать")
         self.export_btn.clicked.connect(self.export_media)
         self.export_btn.setEnabled(False)
         
@@ -413,12 +471,12 @@ class MainWindow(QMainWindow):
         layout.addLayout(button_layout)
         
         # Progress bar
-        self.progress_bar = QProgressBar()
+        self.progress_bar = self.QProgressBar()
         self.progress_bar.setVisible(False)
         layout.addWidget(self.progress_bar)
         
         # Results panel
-        self.results_panel = QTextEdit()
+        self.results_panel = self.QTextEdit()
         self.results_panel.setMaximumHeight(150)
         self.results_panel.setReadOnly(True)
         layout.addWidget(self.results_panel)
@@ -436,19 +494,19 @@ class MainWindow(QMainWindow):
         
         self.level_label.setText(text)
     
-    def drag_enter_event(self, event: QDragEnterEvent):
+    def drag_enter_event(self, event):
         if event.mimeData().hasUrls():
             event.acceptProposedAction()
     
-    def drop_event(self, event: QDropEvent):
+    def drop_event(self, event):
         urls = event.mimeData().urls()
         if urls:
             file_path = urls[0].toLocalFile()
             self.load_file(file_path)
     
     def select_file(self, event):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
+        file_path, _ = self.QFileDialog.getOpenFileName(
+            self.window,
             "Выберите файл",
             "",
             "Media Files (*.jpg *.jpeg *.png *.webp *.mp4 *.mov *.avi *.mkv)"
@@ -507,10 +565,14 @@ class MainWindow(QMainWindow):
             self.processor, 
             self.current_file, 
             self.media_type, 
-            self.level_slider.value()
+            self.level_slider.value(),
+            self.qt_modules
         )
         self.preview_thread.preview_ready.connect(self.preview_ready)
-        self.preview_thread.start()
+        # For compatibility with Nuitka, run in a separate thread
+        import threading
+        thread = threading.Thread(target=self.preview_thread.run)
+        thread.start()
     
     def preview_ready(self, preview_path):
         self.progress_bar.setVisible(False)
@@ -521,7 +583,7 @@ class MainWindow(QMainWindow):
             
             if self.media_type == "image":
                 # Show image preview
-                pixmap = QPixmap(preview_path).scaled(200, 200, Qt.AspectRatioMode.KeepAspectRatio)
+                pixmap = self.QPixmap(preview_path).scaled(200, 200, self.Qt.AspectRatioMode.KeepAspectRatio)
                 self.drop_area.setPixmap(pixmap)
             else:
                 self.results_panel.append("Видео preview сгенерирован")
@@ -534,8 +596,8 @@ class MainWindow(QMainWindow):
         
         # Choose output path
         output_ext = ".mp4" if self.media_type == "video" else os.path.splitext(self.current_file)[1]
-        output_path, _ = QFileDialog.getSaveFileName(
-            self,
+        output_path, _ = self.QFileDialog.getSaveFileName(
+            self.window,
             "Сохранить уникализированный файл",
             f"uniquified_{os.path.basename(self.current_file)}",
             f"Media Files (*{output_ext})"
@@ -552,10 +614,14 @@ class MainWindow(QMainWindow):
             self.current_file,
             output_path,
             self.media_type,
-            self.level_slider.value()
+            self.level_slider.value(),
+            self.qt_modules
         )
         self.process_thread.finished.connect(self.processing_finished)
-        self.process_thread.start()
+        # For compatibility with Nuitka, run in a separate thread
+        import threading
+        thread = threading.Thread(target=self.process_thread.run)
+        thread.start()
     
     def processing_finished(self, output_path):
         self.progress_bar.setVisible(False)
@@ -584,13 +650,55 @@ class MainWindow(QMainWindow):
                     self.results_panel.append("Ошибка при анализе видео уникальности")
         else:
             self.results_panel.append("Ошибка при обработке файла")
+    
+    def show(self):
+        self.window.show()
 
 
 def main():
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec())
+    import sys
+    # Check for CLI mode
+    if "--cli" in sys.argv or "-c" in sys.argv:
+        # CLI mode
+        print("Deep Media Uniqueness Enhancer - CLI Mode")
+        print("Usage: python main.py --cli <input_file> <output_file> <level>")
+        print("Level: 1 (Low), 2 (Medium), 3 (High)")
+        
+        if len(sys.argv) >= 5:
+            input_file = sys.argv[sys.argv.index("--cli") + 1] if "--cli" in sys.argv else sys.argv[sys.argv.index("-c") + 1]
+            output_file = sys.argv[sys.argv.index("--cli") + 2] if "--cli" in sys.argv else sys.argv[sys.argv.index("-c") + 2]
+            try:
+                level = int(sys.argv[sys.argv.index("--cli") + 3]) if "--cli" in sys.argv else int(sys.argv[sys.argv.index("-c") + 3])
+            except (ValueError, IndexError):
+                level = 3  # Default to medium
+            
+            print(f"Processing: {input_file}")
+            print(f"Output: {output_file}")
+            print(f"Level: {level}")
+            
+            processor = MediaProcessor()
+            media_type = "video" if input_file.lower().endswith(('.mp4', '.mov', '.avi', '.mkv', '.webm')) else "image"
+            
+            if media_type == "image":
+                processor.process_image(input_file, output_file, level)
+            else:
+                processor.process_video(input_file, output_file, level)
+            
+            print("Processing completed!")
+        else:
+            print("Not enough arguments for CLI mode")
+    else:
+        # GUI mode
+        try:
+            qt_modules = get_qt_modules()
+            app = qt_modules['QApplication'](sys.argv)
+            window = MainWindow(qt_modules)
+            window.show()
+            sys.exit(app.exec())
+        except ImportError as e:
+            print(f"GUI mode requires PyQt6: {e}")
+            print("Install with: pip install PyQt6")
+            sys.exit(1)
 
 
 if __name__ == "__main__":
